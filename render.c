@@ -12,8 +12,23 @@ uint8_t render_buttons;
 int render_music = -1;
 static uint8_t palette[16];
 static int camera_x, camera_y;
-static uint8_t scenery[2048];
-static int background;
+/* The USB colour frame stays untouched. The LCD has its own native world
+   raster so camera movement never changes sprite geometry or game physics. */
+static uint8_t lcd_world[2048];
+static int background, lcd_suppress, actor;
+static int player_y, player_active, last_player_active;
+static int room_x = -1, room_y = -1, snap_camera;
+static int follow_q8 = 32 * 256;
+static unsigned draw_serial, consumed_serial;
+static struct {
+  int x, y, fixed;
+  unsigned char glyph;
+} text_glyphs[128];
+static unsigned text_count;
+static const uint8_t ink[16] = {0,  0,  0,  1,  1,  7, 11, 16,
+                                16, 12, 16, 16, 12, 4, 16, 12};
+static const uint8_t threshold[4][4] = {
+    {0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
 static uint8_t nibble(const uint8_t *p, unsigned n) {
   return (p[n / 2] >> (4 * (n & 1))) & 15;
 }
@@ -21,10 +36,16 @@ static void pixel(int x, int y, int c) {
   if ((unsigned)x >= 128 || (unsigned)y >= 128)
     return;
   unsigned n = y * 128 + x, s = 4 * (n & 1);
-  if (background)
-    scenery[n / 8] |= 1u << (n & 7);
-  else
-    scenery[n / 8] &= ~(1u << (n & 7));
+  if (!lcd_suppress) {
+    int dark =
+        !background && (actor ? (c != 0 && c != 15)
+                              : ink[palette[c & 15]] > threshold[y & 3][x & 3]);
+    uint8_t bit = 1u << (n & 7);
+    if (dark)
+      lcd_world[n / 8] |= bit;
+    else
+      lcd_world[n / 8] &= ~bit;
+  }
   render_frame[n / 2] =
       (render_frame[n / 2] & ~(15u << s)) | ((unsigned)palette[c & 15] << s);
 }
@@ -76,6 +97,12 @@ void render_init(void) {
     palette[i] = i;
   camera_x = camera_y = 0;
   render_buttons = 0;
+  player_active = last_player_active = text_count = 0;
+  room_x = room_y = -1;
+  follow_q8 = 32 * 256;
+  draw_serial = consumed_serial = 0;
+  background = lcd_suppress = actor = snap_camera = 0;
+  memset(lcd_world, 0, sizeof lcd_world);
   memset(render_frame, 0, sizeof render_frame);
 }
 int render_callback(CELESTE_P8_CALLBACK_TYPE call, ...) {
@@ -117,9 +144,22 @@ int render_callback(CELESTE_P8_CALLBACK_TYPE call, ...) {
     break;
   case CELESTE_P8_RECTFILL: {
     int x = I(), y = I(), x1 = I(), y1 = I(), c = I();
-    if (x == 0 && y == 0 && x1 == 128 && y1 == 128)
+    if (x == 0 && y == 0 && x1 == 128 && y1 == 128) {
       background = 1;
+      player_active = 0;
+      text_count = 0;
+      draw_serial++;
+    }
+    /* Text panels are redrawn in screen space, including the memorial's
+       character-by-character reveal and summit statistics. */
+    lcd_suppress =
+        (x == 24 && y == 58 && x1 == 104 && y1 == 70) ||
+        (x == 32 && y == 2 && x1 == 96 && y1 == 31) ||
+        (((x == 4 && y == 4) || (x == 49 && y == 16)) && x1 == x + 32 &&
+         y1 == y + 6) ||
+        (c == 7 && y >= 94 && y <= 108 && x1 == x + 9 && y1 == y + 8);
     rect(x - camera_x, y - camera_y, x1 - camera_x, y1 - camera_y, c);
+    lcd_suppress = 0;
     break;
   }
   case CELESTE_P8_LINE: {
@@ -139,19 +179,59 @@ int render_callback(CELESTE_P8_CALLBACK_TYPE call, ...) {
     int t = I(), x = I(), y = I(), w = I(), h = I(), fx = I(), fy = I();
     (void)w;
     (void)h;
+    actor = t >= 1 && t <= 7;
+    if (actor) {
+      player_active = 1;
+      player_y = y;
+    }
     sprite(gfx_pixels, t, x - camera_x, y - camera_y, fx, fy, -1);
+    actor = 0;
     break;
   }
   case CELESTE_P8_PRINT: {
     const char *s = va_arg(ap, const char *);
-    int x = I() - camera_x, y = I() - camera_y, c = I();
+    int x = I(), y = I(), c = I();
+    int tx = x, ty = y, fixed = 0;
+    size_t length = strlen(s);
+    if (y == 62 &&
+        (strstr(s, " m") || !strcmp(s, "old site") || !strcmp(s, "summit"))) {
+      tx = (128 - (int)length * 4 + 1) / 2;
+      ty = 12;
+      fixed = 1;
+    } else if ((x == 5 && y == 5) || y == 9 || y == 17 || y == 24) {
+      fixed = 1;
+    } else if (c == 0 && y >= 96 && y <= 110) {
+      ty = y - 66;
+      fixed = 1; /* Three memorial lines remain together. */
+    } else if (c == 5 && (y == 80 || y == 96 || y == 102)) {
+      ty = y - 48;
+      fixed = 1;
+    }
+    /* Clamp each whole string before storing glyphs, not each letter. */
+    if (tx < 1)
+      tx = 1;
+    if (tx + (int)length * 4 > 127)
+      tx = 127 - (int)length * 4;
+    for (unsigned k = 0; s[k] && text_count < 128; k++) {
+      text_glyphs[text_count].x = tx + 4 * k;
+      text_glyphs[text_count].y = ty;
+      text_glyphs[text_count].fixed = fixed;
+      text_glyphs[text_count++].glyph = (unsigned char)s[k] & 127;
+    }
+    lcd_suppress = 1;
     for (; *s; s++, x += 4)
-      sprite(font_pixels, *s & 127, x, y, 0, 0, c);
+      sprite(font_pixels, *s & 127, x - camera_x, y - camera_y, 0, 0, c);
+    lcd_suppress = 0;
     break;
   }
   case CELESTE_P8_MAP: {
     int mx = I(), my = I(), x = I() - camera_x, y = I() - camera_y, w = I(),
         h = I(), mask = I();
+    if (mask == 4 && (mx != room_x || my != room_y)) {
+      room_x = mx;
+      room_y = my;
+      snap_camera = 1;
+    }
     background = mask == 4;
     for (int j = 0; j < h; j++)
       for (int i = 0; i < w; i++) {
@@ -187,39 +267,79 @@ int render_callback(CELESTE_P8_CALLBACK_TYPE call, ...) {
   return result;
 #undef I
 }
+static int clamp(int v, int lo, int hi) {
+  return v < lo ? lo : v > hi ? hi : v;
+}
+static void lcd_pixel(uint8_t output[1024], int x, int y, int dark) {
+  if ((unsigned)x >= 128 || (unsigned)y >= 64)
+    return;
+  uint8_t bit = 1u << (x & 7);
+  if (dark)
+    output[y * 16 + x / 8] |= bit;
+  else
+    output[y * 16 + x / 8] &= ~bit;
+}
 void render_mono(uint8_t output[1024], int mode) {
-  /* Preserve bright hazards/actors from either source row. Stable spatial
-     stippling separates muted mountain/stone without LCD temporal flicker. */
-  static const uint8_t ink[16] = {0,  0,  0,  1,  1,  7, 11, 16,
-                                  16, 12, 16, 16, 12, 4, 16, 12};
-  static const uint8_t threshold[4][4] = {
-      {0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
+  /* Advance once per completed game draw. Hit-stop and repeated USB/UI reads
+     retain the exact image. Follow the unshaken player, with a two-pixel
+     dead zone and subpixel smoothing; clamp at room edges. */
+  if (consumed_serial != draw_serial) {
+    consumed_serial = draw_serial;
+    if (player_active) {
+      int target = clamp(player_y + 4 - 32, 0, 64) * 256;
+      if (snap_camera || !last_player_active)
+        follow_q8 = target;
+      else {
+        int delta = target - follow_q8;
+        if (delta > 512)
+          follow_q8 += (delta - 512) * 3 / 4;
+        if (delta < -512)
+          follow_q8 += (delta + 512) * 3 / 4;
+        /* Even a dash keeps the centre within four pixels of the dead zone. */
+        follow_q8 = clamp(follow_q8, target - 1024, target + 1024);
+      }
+      follow_q8 = clamp(follow_q8, 0, 64 * 256);
+      snap_camera = 0;
+    }
+    last_player_active = player_active;
+  }
+  int top = (follow_q8 + 128) / 256;
   memset(output, 0, 1024);
   for (int y = 0; y < 64; y++)
     for (int x = 0; x < 128; x++) {
-      int sx = x, ox = x;
-      if (mode == 1) {
-        if (x < 32 || x >= 96)
-          continue;
-        sx = (x - 32) * 2;
-      }
-      int a = ink[nibble(render_frame, y * 256 + sx)],
-          b = ink[nibble(render_frame, y * 256 + 128 + sx)];
-      if (scenery[(y * 256 + sx) / 8] & (1u << (sx & 7)))
-        a = 0;
-      if (scenery[(y * 256 + 128 + sx) / 8] & (1u << (sx & 7)))
-        b = 0;
-      int v = a > b ? a : b;
-      if (mode == 1) {
-        for (int j = 0; j < 2; j++) {
-          int c = ink[nibble(render_frame, y * 256 + j * 128 + sx + 1)];
-          if (!(scenery[(y * 256 + j * 128 + sx + 1) / 8] &
-                (1u << ((sx + 1) & 7))) &&
-              c > v)
-            v = c;
+      if (mode == 1 && (x < 32 || x >= 96))
+        continue;
+      int sx = mode == 1 ? (x - 32) * 2 : x;
+      int sy = mode == 1 ? y * 2 : y + top;
+      int dark = 0;
+      for (int j = 0; j < (mode == 1 ? 2 : 1); j++)
+        for (int i = 0; i < (mode == 1 ? 2 : 1); i++) {
+          unsigned n = (sy + j) * 128 + sx + i;
+          dark |= (lcd_world[n / 8] >> (n & 7)) & 1;
         }
-      }
-      if (v > threshold[y & 3][x & 3])
-        output[y * 16 + ox / 8] |= 1u << (ox & 7);
+      lcd_pixel(output, x, y, dark);
     }
+  /* All text is a screen-space overlay. Clear every panel first so adjacent
+     letters (including the memorial reveal) cannot erase previous glyphs. */
+  for (unsigned k = 0; k < text_count; k++) {
+    int x = text_glyphs[k].x;
+    int y = text_glyphs[k].fixed ? text_glyphs[k].y
+            : mode == 1          ? text_glyphs[k].y / 2
+                                 : text_glyphs[k].y - top;
+    y = clamp(y, 1, 58);
+    for (int j = -1; j <= 5; j++)
+      for (int i = -1; i <= 3; i++)
+        lcd_pixel(output, x + i, y + j, 0);
+  }
+  for (unsigned k = 0; k < text_count; k++) {
+    int x = text_glyphs[k].x, t = text_glyphs[k].glyph;
+    int y = text_glyphs[k].fixed ? text_glyphs[k].y
+            : mode == 1          ? text_glyphs[k].y / 2
+                                 : text_glyphs[k].y - top;
+    y = clamp(y, 1, 58);
+    for (int j = 0; j < 5; j++)
+      for (int i = 0; i < 3; i++)
+        if (nibble(font_pixels, (t / 16 * 8 + j) * 128 + t % 16 * 8 + i))
+          lcd_pixel(output, x + i, y + j, 1);
+  }
 }

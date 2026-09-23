@@ -137,7 +137,7 @@ static void draw(Canvas *canvas, void *ctx) {
           "Resume",
           "Restart run",
           "Lifetime stats",
-          a->progress.display_mode ? "View: square" : "View: wide",
+          a->progress.display_mode ? "View: overview" : "View: follow",
           a->progress.muted ? "Sound: off" : "Sound: on",
           a->save_failed ? "Retry save + exit" : "Save + exit"};
       for (int i = 0; i < 6; i++) {

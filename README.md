@@ -17,7 +17,8 @@ You can omit the EXE for Flipper-only play. Start **Games → Celeste Classic**.
 - Hold Back: pause/settings. Because dash responds immediately, this hold dashes first; pause from a safe position.
 - **Open on computer** is the first settings item. Its submenu offers Windows automatic launch and Mac/Linux manual USB modes.
 - Restart run requires an in-game confirmation and preserves lifetime berries, deaths, summits, restarts, and highest room.
-- Wide mode compresses 128×128 into 128×64. Square mode preserves aspect ratio at 64×64. The renderer removes decorative background scenery, uses fixed spatial patterns for stone, and retains bright hazards from both source rows. No temporal dithering.
+- Follow view shows a native 128×64 window into the 128×128 room. Madeline retains the original 8×8 sprite geometry and animation frames, with a white face and solid jacket/boots. Vertical scrolling uses a tight two-pixel dead zone, smooth following and room-edge clamps; physics are unchanged. Optional Overview shows the whole room at 64×64. Decorative scenery is removed and stone uses stable spatial patterns, without temporal dithering.
+- Timer, altitude, memorial, credits and summit text stay inside the screen on opaque white panels, independent of scrolling.
 - Music is a simplified monophonic arrangement of cartridge patterns plus effects through Momentum notifications; the firmware's volume/mute applies. The speaker cannot reproduce the original four-channel sound.
 
 ## Saves and Dolphin XP
@@ -54,6 +55,7 @@ An optional `celeste_portable.img` contains manual launchers for Momentum's **US
 
 - FAP compiles and passes imported-symbol checks against the released Momentum mntm-012 SDK.
 - Actual C core/renderer host tests cover all 31 rooms, movement/jump/dash, deaths, checkpoint reconstruction, completion deduplication, lifetime statistics and corrupt-save rejection.
+- Renderer tests cover every player animation/direction, native pixel geometry, camera edges/room changes/death/freeze, and text visibility in both views.
 - Native installer tests validate extraction and reject unsafe archive paths.
 - ARM build is not a physical-device test. Full Flipper firmware emulation was not set up: the available route requires a patched emulator toolchain. Host captures below show the actual game renderer, not a physical LCD.
 - Physical button feel, speaker output, USB/HID launch, Windows installer execution, and device performance still require hardware checks. See `docs/ACCEPTANCE.md`.
@@ -71,6 +73,7 @@ Download the [mntm-012 SDK](https://github.com/Next-Flip/Momentum-Firmware/relea
 python3 scripts/build_portable.py
 .venv/bin/ufbt
 .venv/bin/python tests/test_core.py
+.venv/bin/python tests/test_render.py
 python3 tests/test_portable_disk.py
 ```
 

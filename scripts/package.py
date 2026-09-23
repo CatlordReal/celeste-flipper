@@ -11,7 +11,7 @@ for f in sorted((d/'portable').glob('Celeste-*')):
 for name in ('README.md','THIRD_PARTY.md'):shutil.copy2(r/name,bundle/name)
 files=[p for p in bundle.rglob('*') if p.is_file() and p.name!='SHA256SUMS']
 (bundle/'SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+str(p.relative_to(bundle))+'\n' for p in sorted(files)))
-archive=d/'celeste-flipper-v0.1.0.zip'
+archive=d/'celeste-flipper-v0.1.1.zip'
 with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:
  for p in sorted(bundle.rglob('*')):
   if p.is_file():z.write(p,p.relative_to(d))
