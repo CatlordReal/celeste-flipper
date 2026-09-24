@@ -1,0 +1,45 @@
+name: Scan published Windows helper
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  defender:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Scan exact published helper without executing it
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $report = Join-Path $env:RUNNER_TEMP 'defender-report'
+          New-Item -ItemType Directory $report | Out-Null
+          Start-Transcript -Path (Join-Path $report 'scan.txt')
+          try {
+            $status = Get-MpComputerStatus
+            $status | Select-Object AMServiceEnabled,AntivirusEnabled,AMEngineVersion,AntivirusSignatureVersion,AntivirusSignatureLastUpdated | ConvertTo-Json | Tee-Object -FilePath (Join-Path $report 'engine.json')
+            if (-not $status.AMServiceEnabled) { throw 'Microsoft Defender service unavailable on this runner; no scan result.' }
+            Update-MpSignature
+            Get-MpComputerStatus | Select-Object AMEngineVersion,AntivirusSignatureVersion,AntivirusSignatureLastUpdated | ConvertTo-Json | Tee-Object -FilePath (Join-Path $report 'scan-engine.json')
+            $zip = Join-Path $env:RUNNER_TEMP 'celeste-flipper-v0.1.1.zip'
+            Invoke-WebRequest 'https://github.com/CatlordReal/celeste-flipper/releases/download/v0.1.1/celeste-flipper-v0.1.1.zip' -OutFile $zip
+            $destination = Join-Path $env:RUNNER_TEMP 'celeste-scan'
+            Expand-Archive $zip -DestinationPath $destination
+            $exe = Join-Path $destination 'Celeste-Flipper/sdcard/apps_data/celeste_classic/Celeste-Windows.exe'
+            $hash = Get-FileHash $exe -Algorithm SHA256
+            $hash | Format-List | Out-String | Tee-Object -FilePath (Join-Path $report 'sha256.txt')
+            if ($hash.Hash.ToLowerInvariant() -ne 'c757023bc93a658b9aef98d1787f8525687a1068809b239147068f67eb662975') { throw 'Published helper hash mismatch; scan is not the expected release.' }
+            $scanner = Get-ChildItem "$env:ProgramData/Microsoft/Windows Defender/Platform/*/MpCmdRun.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+            if (-not $scanner) { throw 'Microsoft Defender command-line scanner unavailable; no scan result.' }
+            & $scanner.FullName -Scan -ScanType 3 -File $exe -DisableRemediation
+            $scanExit = $LASTEXITCODE
+            Get-MpThreatDetection | Select-Object ThreatID,InitialDetectionTime,Resources,ActionSuccess | ConvertTo-Json -Depth 5 | Out-File (Join-Path $report 'detections.json')
+            "Scanner exit code: $scanExit" | Tee-Object -FilePath (Join-Path $report 'result.txt')
+            if ($scanExit -ne 0) { throw "Defender scan failed or detected a threat (exit $scanExit)." }
+          } finally { Stop-Transcript }
+      - name: Preserve scan evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: defender-report
+          path: ${{ runner.temp }}/defender-report
