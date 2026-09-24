@@ -4,7 +4,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef HOST_TEST
+#if !defined(HOST_TEST) || defined(CELESTE_IOS)
 #include "audio.h"
 #endif
 uint8_t render_frame[8192];
@@ -248,14 +248,14 @@ int render_callback(CELESTE_P8_CALLBACK_TYPE call, ...) {
   }
   case CELESTE_P8_MUSIC: {
     render_music = I();
-#ifndef HOST_TEST
+#if !defined(HOST_TEST) || defined(CELESTE_IOS)
     audio_music(render_music);
 #endif
     break;
   }
   case CELESTE_P8_SFX: {
     int s = I();
-#ifndef HOST_TEST
+#if !defined(HOST_TEST) || defined(CELESTE_IOS)
     audio_sfx(s);
 #else
     (void)s;

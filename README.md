@@ -2,6 +2,10 @@
 
 Celeste Classic (the original PICO-8 game), using [ccleste](https://github.com/lemon32767/ccleste), adapted for stock Flipper Zero hardware running **Momentum mntm-012 / API 87.1**. No expansion module is required.
 
+## iPhone
+
+A native iPhone version with a full-colour square display, compact eight-direction touch pad, haptics, audio, room checkpoints and lifetime statistics is in [`ios/`](ios/README.md).
+
 ## Install
 
 Download the release ZIP and copy the **contents of `sdcard/`** to the Flipper's microSD card with qFlipper. This places:

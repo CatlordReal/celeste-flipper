@@ -9,3 +9,7 @@
 - **Go serial**: https://github.com/bugst/go-serial, v1.6.4, BSD-3-Clause; dependencies and hashes are pinned in `portable/native/go.mod` and `go.sum`.
 
 The ccleste repository does not provide an explicit LICENSE file at the pinned revision. Attribution is not a new license grant. Original game/code/art/music and bundled upstream binaries retain their authors' rights; this repository does not claim to relicense them. No commercial Celeste assets are included.
+
+## iPhone icon
+
+`ios/upstream-icon.png` is the original `icon.png` from the same upstream [ccleste repository](https://github.com/lemon32767/ccleste/blob/master/icon.png). The iPhone asset preserves those pixels with nearest-neighbor scaling and an 8% smaller image on a black background. Original Celeste Classic art is credited to Maddy Thorson and Noel Berry.

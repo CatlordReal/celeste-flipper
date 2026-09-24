@@ -13,6 +13,9 @@
 #include <stdio.h>
 
 #include "celeste.h"
+#ifdef CELESTE_IOS
+uint64_t celeste_ios_dashes;
+#endif
 
 
 #ifdef CELESTE_P8_FIXEDP
@@ -820,6 +823,9 @@ static void PLAYER_update(OBJ* this) {
 			this->djump-=1;
 			this->dash_time=4;
 			has_dashed=true;
+#ifdef CELESTE_IOS
+            celeste_ios_dashes++;
+#endif
 			this->dash_effect_time=10;
 			int v_input=(P8btn(k_up) ? -1 : (P8btn(k_down) ? 1 : 0));
 			if (input!=0) {
