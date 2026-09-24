@@ -6,6 +6,7 @@ App(
     requires=["gui", "storage", "notification", "dolphin"],
     stack_size=4096,
     fap_category="Games",
+    fap_icon="celeste_icon.png",
     fap_version=(0, 1),
     fap_author="CatlordReal; ccleste contributors; Maddy Thorson; Noel Berry",
     fap_description="Celeste Classic for stock Flipper Zero and Momentum",

@@ -14,7 +14,7 @@ You can omit the EXE for Flipper-only play. Start **Games → Celeste Classic**.
 ## Controls and graphics
 
 - Arrows: move and aim; **OK: jump; Back: dash**.
-- Hold Back: pause/settings. Because dash responds immediately, this hold dashes first; pause from a safe position.
+- Hold Back: pause/settings. The menu stays open while Back remains held; release it and tap Back to resume. Because dash responds immediately, this hold dashes first; pause from a safe position.
 - **Open on computer** is the first settings item. Its submenu offers Windows automatic launch and Mac/Linux manual USB modes.
 - Restart run requires an in-game confirmation and preserves lifetime berries, deaths, summits, restarts, and highest room.
 - Follow view shows a native 128×64 window into the 128×128 room. Madeline retains the original 8×8 sprite geometry and animation frames, with a white face and solid jacket/boots. Vertical scrolling uses a tight two-pixel dead zone, smooth following and room-edge clamps; physics are unchanged. Optional Overview shows the whole room at 64×64. Decorative scenery is removed and stone uses stable spatial patterns, without temporal dithering.
@@ -38,6 +38,12 @@ A saved strawberry awards **1 Dolphin XP**, a saved first summit in a run **10 X
 This types commands into the foreground desktop. Do not use the Windows option on macOS/Linux, a locked session, a non-US keyboard layout, or while another task owns the foreground. Endpoint security, execution restrictions, USB policies or a slow-opening console can prevent launch; no policy bypass is attempted. Windows HID/USB launch is **built but not tested on a physical Windows/Flipper pair**.
 
 The browser renders only the original PICO-8 game, not commercial Celeste (2018). The portable page exposes the requested Catppuccin/Sand appearance palettes and a clock-based schedule; it does not claim astronomical sunrise detection.
+
+## Windows Defender report
+
+A user reported Wacatac blocking `Celeste-Windows.exe` when copying it to SD. The exact released file passed a Microsoft Defender custom scan on a fresh Windows runner on 2026-09-24 with updated security intelligence **1.459.378.0**, engine **1.1.26080.3**. The helper has not been changed to alter its detection. This result does not establish that the user's machine will now accept it, or validate runtime behavior. [Scan evidence and scope](docs/DEFENDER.md).
+
+Keep Defender enabled. When back at the computer, use **Windows Security → Virus & threat protection → Protection updates → Check for updates**, then download and scan the file again. If it is still blocked, leave it quarantined and use the standalone FAP while the exact detection is reviewed. Do not add an exclusion or disable protection. Microsoft's [file submission portal](https://www.microsoft.com/en-us/wdsi/filesubmission) handles suspected incorrect detections.
 
 ## Separate permanent Windows game
 
@@ -74,6 +80,7 @@ python3 scripts/build_portable.py
 .venv/bin/ufbt
 .venv/bin/python tests/test_core.py
 .venv/bin/python tests/test_render.py
+.venv/bin/python tests/test_pause_input.py
 python3 tests/test_portable_disk.py
 ```
 

@@ -9,9 +9,11 @@ shutil.copy2(d/'portable/Celeste-Windows.exe',bundle/'sdcard/apps_data/celeste_c
 for f in sorted((d/'portable').glob('Celeste-*')):
  if f.name!='Celeste-Windows.exe':shutil.copy2(f,bundle/'manual'/f.name)
 for name in ('README.md','THIRD_PARTY.md'):shutil.copy2(r/name,bundle/name)
+(bundle/'docs').mkdir(exist_ok=True)
+shutil.copy2(r/'docs/DEFENDER.md',bundle/'docs/DEFENDER.md')
 files=[p for p in bundle.rglob('*') if p.is_file() and p.name!='SHA256SUMS']
 (bundle/'SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+str(p.relative_to(bundle))+'\n' for p in sorted(files)))
-archive=d/'celeste-flipper-v0.1.1.zip'
+archive=d/'celeste-flipper-v0.1.2.zip'
 with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:
  for p in sorted(bundle.rglob('*')):
   if p.is_file():z.write(p,p.relative_to(d))

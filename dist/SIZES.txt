@@ -1,5 +1,5 @@
 Flipper FAP: 82,808 bytes
 Flipper + Windows helper on SD: 9,666,424 bytes
-Complete extracted bundle: 27,969,687 bytes
-Release ZIP: 13,322,633 bytes
+Complete extracted bundle: 27,973,500 bytes
+Release ZIP: 13,324,859 bytes
 Optional manual USB disk image: 33,554,432 bytes

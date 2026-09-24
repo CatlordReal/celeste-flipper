@@ -194,7 +194,7 @@ static void event(App *a, InputEvent e) {
   if (e.type != InputTypeShort && e.type != InputTypeRepeat)
     return;
   if (a->open_menu) {
-    if (e.key == InputKeyBack) {
+    if (e.key == InputKeyBack && e.type == InputTypeShort) {
       a->open_menu = false;
       return;
     }
@@ -221,7 +221,7 @@ static void event(App *a, InputEvent e) {
     }
     return;
   }
-  if (e.key == InputKeyBack) {
+  if (e.key == InputKeyBack && e.type == InputTypeShort) {
     if (a->stats || a->confirm_restart) {
       a->stats = a->confirm_restart = false;
     } else {
